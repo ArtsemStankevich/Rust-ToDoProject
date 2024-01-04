@@ -6,6 +6,15 @@ struct Task {
     completed: bool,
 }
 
+impl Task {
+    fn new(description: &str, completed: bool) -> Task {
+        Task {
+            description: String::from(description),
+            completed,
+        }
+    }
+}
+
 fn main() {
     let file_path = "tasks.txt";
     let mut tasks = read_tasks_from_file(file_path);
@@ -78,14 +87,7 @@ fn main() {
 }
 
 
-impl Task {
-    fn new(description: &str) -> Task {
-        Task {
-            description: String::from(description),
-            completed: false,
-        }
-    }
-}
+
 
 fn read_tasks_from_file(file_path: &str) -> Vec<Task> {
     let mut tasks = Vec::new();
@@ -95,7 +97,8 @@ fn read_tasks_from_file(file_path: &str) -> Vec<Task> {
 
         for line in reader.lines() {
             if let Ok(description) = line {
-                tasks.push(Task::new(&description));
+                let (description, completed) = parse_task_description(&description);
+                tasks.push(Task::new(&description, completed));
             }
         }
     }
@@ -103,15 +106,42 @@ fn read_tasks_from_file(file_path: &str) -> Vec<Task> {
     tasks
 }
 
+fn parse_task_description(description: &str) -> (String, bool) {
+    let mut iter = description.trim().rsplitn(2, ' ');
+
+    if let Some(completed_str) = iter.next() {
+        let description = iter.next().unwrap_or_default().trim().to_string();
+        let completed = match completed_str.trim() {
+            "X" => false,
+            "$" => true,
+            _ => false,
+        };
+        (description, completed)
+    } else {
+        (description.trim().to_string(), false)
+    }
+}
+
+fn save_tasks_to_file(tasks: &[Task], file_path: &str) -> io::Result<()> {
+    let mut file = File::create(file_path)?;
+
+    for task in tasks {
+        let status = if task.completed { "$" } else { "X" };
+        writeln!(&mut file, "{} {}", task.description, status)?;
+    }
+
+    Ok(())
+}
+
 fn print_tasks(tasks: &[Task]) {
     for (index, task) in tasks.iter().enumerate() {
-        let status = if task.completed { "Done" } else { "Not Done" };
+        let status = if task.completed { "$" } else { "X" };
         println!("{}. [{}] {}", index + 1, status, task.description);
     }
 }
 
 fn add_task(tasks: &mut Vec<Task>, description: &str) {
-    let new_task = Task::new(description);
+    let new_task = Task::new(description, false);
     tasks.push(new_task);
     println!("Task added: {}", description);
 }
@@ -142,14 +172,3 @@ fn remove_task(tasks: &mut Vec<Task>, index: usize) {
         println!("Invalid task index");
     }
 }
-
-fn save_tasks_to_file(tasks: &[Task], file_path: &str) -> io::Result<()> {
-    let mut file = File::create(file_path)?;
-
-    for task in tasks {
-        writeln!(&mut file, "{}", task.description)?;
-    }
-
-    Ok(())
-}
-
